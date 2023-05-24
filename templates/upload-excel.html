@@ -1,17 +1,164 @@
 <!DOCTYPE html>
 <html lang="en">
+  <head>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link
+      href="https://fonts.googleapis.com/css2?family=Poppins&display=swap"
+      rel="stylesheet"
+    />
+    <title>Vevox Reports Formatter | WiseChamps</title>
+  </head>
 
-<head>
-    <title>Upload/View Excel</title>
-</head>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: "Poppins", sans-serif;
+      color: white;
+    }
+    div h1 {
+      text-align: center;
+      font-size: 40px;
+      margin-bottom: 40px;
+    }
+    .login-box {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 500px;
+      padding: 50px;
+      transform: translate(-50%, -50%);
+      background: rgba(24, 20, 20, 0.987);
+      box-sizing: border-box;
+      box-shadow: 0 15px 25px rgba(0, 0, 0, 0.6);
+      border-radius: 10px;
+    }
 
-<body>
-    <h1>Upload Excel File (.xlsx)</h1>
-    <form action="{{ url_for('view') }}" method="post" enctype="multipart/form-data">
-        <input type="file" name="file"
-            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel">
-        <input type="submit" value="Upload">
-    </form>
-</body>
+    .login-box .user-box {
+      position: relative;
+    }
 
+    .login-box .user-box input {
+      width: 100%;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      margin-bottom: 30px;
+      border: none;
+      border-bottom: 1px solid #fff;
+      outline: none;
+      background: transparent;
+      cursor: pointer;
+    }
+
+    .login-box .user-box label {
+      position: absolute;
+      top: 0;
+      left: 0;
+      padding: 10px 0;
+      font-size: 16px;
+      color: #fff;
+      pointer-events: none;
+      transition: 0.5s;
+    }
+
+    .login-box .user-box input:focus ~ label,
+    .login-box .user-box input:valid ~ label {
+      top: -20px;
+      left: 0;
+      color: #bdb8b8;
+      font-size: 12px;
+    }
+
+    .login-box form input[type="submit"] {
+      position: relative;
+      display: inline-block;
+      padding: 10px 20px;
+      color: #ffffff;
+      font-size: 16px;
+      text-decoration: none;
+      text-transform: uppercase;
+      overflow: hidden;
+      transition: 0.5s;
+      margin: 45px 0;
+      letter-spacing: 4px;
+    }
+
+    .login-box input[type="submit"]:hover {
+      cursor: pointer;
+      background: #03f40f;
+      color: #fff;
+      border-radius: 5px;
+      box-shadow: #03f40f 0px 7px 29px 0px;
+    }
+
+    .login-box .upload {
+      overflow-x: hidden;
+    }
+
+    .login-box .upload > span {
+      position: absolute;
+      display: block;
+    }
+
+    @keyframes btn-anim1 {
+      0% {
+        left: -100%;
+      }
+
+      50%,
+      100% {
+        left: 100%;
+      }
+    }
+
+    .login-box .upload span {
+      bottom: 45px;
+      left: -100%;
+      width: 100%;
+      height: 2px;
+      background: linear-gradient(90deg, transparent, #03f40f);
+      animation: btn-anim1 2s linear infinite;
+    }
+
+    .login-box input[type="file"]::file-selector-button {
+      margin-right: 20px;
+      border: none;
+      background: #018508;
+      padding: 10px 20px;
+      border-radius: 5px;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.2s ease-in-out;
+    }
+
+    .login-box input[type="file"]::file-selector-button:hover {
+      background: #03f40f;
+    }
+  </style>
+
+  <body>
+    <div class="login-box">
+      <h1>UPLOAD EXCEL FILE</h1>
+      <form
+        action="{{ url_for('view') }}"
+        method="post"
+        enctype="multipart/form-data"
+      >
+        <div class="user-box">
+          <input
+            type="file"
+            name="file"
+            accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
+          />
+        </div>
+        <div class="user-box upload">
+          <input type="submit" value="Upload" />
+          <span></span>
+        </div>
+      </form>
+    </div>
+  </body>
 </html>
