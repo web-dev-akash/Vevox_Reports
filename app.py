@@ -17,7 +17,7 @@ def upload():
     return render_template('upload-excel.html')
 
 
-@app.post('/view')
+@app.post('/')
 def view():
     sheet = client.open("Test Sheet").get_worksheet_by_id(116082223)
     sheetData = sheet.get_all_records()
