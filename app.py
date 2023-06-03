@@ -31,7 +31,8 @@ def view():
     data = pd.read_excel(file, sheet_name='Attendance',
                          header=10, usecols=[0, 1, 2, 3])
     newData = data[~(data['Email'].isnull())]
-
+    newData['First Joined'] = pd.to_datetime(newData['First Joined'])
+    newData['First Joined'] = newData['First Joined'].dt.strftime('%d %B %Y').astype(str)
     pollingData = pd.read_excel(
         file, sheet_name='Polling Results', header=8, usecols=[0, 1, 2])
     newPollingData = pollingData[
