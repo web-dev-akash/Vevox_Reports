@@ -31,8 +31,7 @@ def view():
     data = pd.read_excel(file, sheet_name='Attendance',
                          header=10, usecols=[0, 1, 2, 3])
     newData = data[~(data['Email'].isnull())]
-    newData['First Joined'] = pd.to_datetime(newData['First Joined'])
-    newData['First Joined'] = newData['First Joined'].dt.strftime('%d %B %Y').astype(str)
+    newData['First Joined'] = newData['First Joined'].str[:-13]
     pollingData = pd.read_excel(
         file, sheet_name='Polling Results', header=8, usecols=[0, 1, 2])
     newPollingData = pollingData[
@@ -84,6 +83,6 @@ def view():
     data = uniqueRows.values.tolist()
     print(data)
     if len(data) > 0:
-        sheet.append_rows(data)
+        sheet.append_rows(data, value_input_option='USER_ENTERED')
 
     return uniqueRows.to_html()
