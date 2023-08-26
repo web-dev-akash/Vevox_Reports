@@ -1,15 +1,16 @@
 <!DOCTYPE html>
 <html lang="en">
   <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Poppins&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;500;600;700;800&display=swap"
       rel="stylesheet"
     />
-    <title>Vevox Reports Formatter | WiseChamps</title>
+    <title>Upload Excel File</title>
   </head>
-
   <style>
     * {
       margin: 0;
@@ -138,19 +139,14 @@
       background: #03f40f;
     }
   </style>
-
   <body>
     <div class="login-box">
-      <h1>UPLOAD EXCEL FILE</h1>
-      <form
-        action="{{ url_for('view') }}"
-        method="post"
-        enctype="multipart/form-data"
-      >
+      <h1>Upload Excel File</h1>
+      <form action="/view" method="post" enctype="multipart/form-data">
         <div class="user-box">
           <input
             type="file"
-            name="file"
+            name="file.xlsx"
             accept="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet, application/vnd.ms-excel"
           />
         </div>
