@@ -125,15 +125,17 @@ app.post("/view", upload.single("file.xlsx"), async (req, res) => {
     const sheetName2 = workbook.SheetNames[2];
     const sheet2 = workbook.Sheets[sheetName2];
     const data2 = xlsx.utils.sheet_to_json(sheet2);
-    const totalPolled = Object.values(data2[2]).filter(
-      (val) => val === "Multichoice"
-    ).length;
+    const totalPolled = Object.values(data2[2]).length - 3;
     for (let i = 7; i < data2.length - 2; i++) {
       const firstname = data2[i]["Polling Results"];
       const lastname = data2[i]["__EMPTY"];
-      const correct = data2[i]["__EMPTY_1"];
+      const correct = data2[i]["__EMPTY_1"] ? data2[i]["__EMPTY_1"] : 0;
+      const totalNotEmpty = Object.values(data2[i]).filter(
+        (val) => val === ""
+      ).length;
+      console.log(totalNotEmpty);
       const totalAttempted =
-        Object.values(data2[i]).filter((val) => val !== "").length - 4;
+        totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
       const userFound = currentUsers.find(
         (user) => user.firstname === firstname && user.lastname === lastname
       );
@@ -151,6 +153,7 @@ app.post("/view", upload.single("file.xlsx"), async (req, res) => {
         finalUsers.push(obj);
       }
     }
+    // return res.send({ data1, data2, finalUsers });
     const data = await updateDataOnVevoxSheet(finalUsers);
     let table = "";
     data.map(
