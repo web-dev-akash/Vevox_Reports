@@ -12,15 +12,12 @@ require("dotenv").config();
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
-const CLIENT_ID = process.env.CLIENT_ID;
-const CLIENT_SECRET = process.env.CLIENT_SECRET;
-const REFRESH_TOKEN = process.env.REFRESH_TOKEN;
 const PORT = process.env.PORT || 8080;
 
 const storage = multer.diskStorage({
   destination: path.join(__dirname, "uploads"),
   filename: function (req, file, cb) {
-    cb(null, file.fieldname);
+    cb(null, file.originalname);
   },
 });
 const upload = multer({ storage: storage });
@@ -100,60 +97,73 @@ const updateDataOnVevoxSheet = async (users) => {
   return addVevoxData;
 };
 
-app.post("/view", upload.single("file.xlsx"), async (req, res) => {
-  try {
-    const workbook = xlsx.readFile("./uploads/file.xlsx");
-    const sheetName1 = workbook.SheetNames[0];
-    const sheet1 = workbook.Sheets[sheetName1];
-    const data1 = xlsx.utils.sheet_to_json(sheet1);
-    const sessionId = data1[4]["__EMPTY"];
-    const currentUsers = [];
-    for (let i = 8; i < data1.length; i++) {
-      const firstname = data1[i][""];
-      const lastname = data1[i]["__EMPTY"];
-      const email = data1[i]["__EMPTY_1"];
-      const attemptDate = new Date(
-        data1[i]["__EMPTY_2"].substring(0, 11)
-      ).toDateString();
-      const obj = { firstname, lastname, email, attemptDate };
-      if (email && !email.includes("1234500")) {
-        currentUsers.push(obj);
-      }
-    }
-
-    const finalUsers = [];
-    const sheetName2 = workbook.SheetNames[2];
-    const sheet2 = workbook.Sheets[sheetName2];
-    const data2 = xlsx.utils.sheet_to_json(sheet2);
-    const totalPolled = Object.values(data2[2]).length - 3;
-    for (let i = 7; i < data2.length - 2; i++) {
-      const firstname = data2[i]["Polling Results"];
-      const lastname = data2[i]["__EMPTY"];
-      const correct = data2[i]["__EMPTY_1"] ? data2[i]["__EMPTY_1"] : 0;
-      const totalNotEmpty = Object.values(data2[i]).filter(
-        (val) => val === ""
-      ).length;
-      console.log(totalNotEmpty);
-      const totalAttempted =
-        totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
-      const userFound = currentUsers.find(
-        (user) => user.firstname === firstname && user.lastname === lastname
+app.post("/view", upload.array("file", 50), async (req, res) => {
+  const files = req.files;
+  if (files.length === 0) {
+    return res
+      .status(400)
+      .send(
+        `<h1 style="display:grid;place-items:center;min-height:100vh;">No files were uploaded.</h1>`
       );
-      if (userFound) {
-        const obj = {
-          firstname,
-          lastname,
-          correct,
-          email: userFound.email,
-          date: userFound.attemptDate,
-          polled: totalPolled,
-          attempted: totalAttempted,
-          sessionId,
-        };
-        finalUsers.push(obj);
+  }
+  try {
+    const finalUsers = [];
+    for (const file of files) {
+      console.log(file.path);
+      const workbook = xlsx.readFile(file.path);
+      const sheetName1 = workbook.SheetNames[0];
+      const sheet1 = workbook.Sheets[sheetName1];
+      const data1 = xlsx.utils.sheet_to_json(sheet1);
+      const sessionId = data1[4]["__EMPTY"];
+      const currentUsers = [];
+      for (let i = 8; i < data1.length; i++) {
+        const firstname = data1[i][""];
+        const lastname = data1[i]["__EMPTY"];
+        const email = data1[i]["__EMPTY_1"];
+        const attemptDate = new Date(
+          data1[i]["__EMPTY_2"].substring(0, 11)
+        ).toDateString();
+        const obj = { firstname, lastname, email, attemptDate };
+        if (email && !email.includes("1234500")) {
+          currentUsers.push(obj);
+        }
+      }
+
+      const sheetName2 = workbook.SheetNames[2];
+      const sheet2 = workbook.Sheets[sheetName2];
+      const data2 = xlsx.utils.sheet_to_json(sheet2);
+      const totalPolled = Object.values(data2[2]).length - 3;
+      for (let i = 7; i < data2.length - 2; i++) {
+        const firstname = data2[i]["Polling Results"];
+        const lastname = data2[i]["__EMPTY"];
+        const correct = data2[i]["__EMPTY_1"] ? data2[i]["__EMPTY_1"] : 0;
+        const totalNotEmpty = Object.values(data2[i]).filter(
+          (val) => val === ""
+        ).length;
+        console.log(totalNotEmpty);
+        const totalAttempted =
+          totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
+        const userFound = currentUsers.find(
+          (user) => user.firstname === firstname && user.lastname === lastname
+        );
+        if (userFound) {
+          const obj = {
+            firstname,
+            lastname,
+            correct,
+            email: userFound.email,
+            date: userFound.attemptDate,
+            polled: totalPolled,
+            attempted: totalAttempted,
+            sessionId,
+          };
+          finalUsers.push(obj);
+        }
       }
     }
-    // return res.send({ data1, data2, finalUsers });
+    for (const file of files) {
+      await unlinkAsync(file.path);
+    }
     const data = await updateDataOnVevoxSheet(finalUsers);
     let table = "";
     data.map(
@@ -169,7 +179,7 @@ app.post("/view", upload.single("file.xlsx"), async (req, res) => {
           <td style="border:1px solid; padding:10px 20px;">${user[7]}</td>
         </tr>`)
     );
-    res.send(`
+    return res.status(200).send(`
     <div style="width : 80%; margin : 50px auto; text-align : center; display : grid; place-items:center;">
       <h1>Excel file uploaded and processed successfully.</h1>
       <Table style="text-align : center; font-size : 20px; margin-top : 20px; border-collapse: collapse; ">
@@ -187,13 +197,12 @@ app.post("/view", upload.single("file.xlsx"), async (req, res) => {
       </Table>
     </div>
     `);
-    await unlinkAsync(req.file.path);
-    return;
   } catch (error) {
     console.error("Error reading Excel file:", error);
-    res.status(500).send({ error: "Error reading Excel file." });
-    await unlinkAsync(req.file.path);
-    return;
+    for (const file of files) {
+      await unlinkAsync(file.path);
+    }
+    return res.status(500).send({ error: "Error reading Excel file." });
   }
 });
 
