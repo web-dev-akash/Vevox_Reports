@@ -133,37 +133,7 @@ const updateDataonZoho = async (users) => {
         });
       }
     }
-    // const date = new Date();
-    // const year = date.getFullYear();
-    // const month = (date.getMonth() + 1).toString().padStart(2, "0");
-    // const day = date.getDate().toString().padStart(2, "0");
-    // const formattedDate = `${year}-${month}-${day}`;
-    // const body = {
-    //   data: [
-    //     {
-    //       id: contactId,
-    //       [key]: formattedDate,
-    //       $append_values: {
-    //         [key]: true,
-    //       },
-    //     },
-    //   ],
-    //   duplicate_check_fields: ["id"],
-    //   apply_feature_execution: [
-    //     {
-    //       name: "layout_rules",
-    //     },
-    //   ],
-    //   trigger: ["workflow"],
-    // };
-    // await axios.post(
-    //   `https://www.zohoapis.com/crm/v3/Contacts/upsert`,
-    //   body,
-    //   config
-    // );
   }
-
-  ("https://www.zohoapis.com/crm/v2.1/Leads/actions/count");
 
   const attemptsCount = await axios.get(
     `https://www.zohoapis.com/crm/v2.1/Attempts/actions/count`,
@@ -177,7 +147,7 @@ const updateDataonZoho = async (users) => {
       `https://www.zohoapis.com/crm/v2/Attempts/search?criteria=((Contact_Name:equals:${attemptsData[i].contactId})and(Session:equals:${attemptsData[i].sessionId}))`,
       config
     );
-    if (!attempts.data && !attempts.data.data) {
+    if (!attempts || !attempts.data || !attempts.data.data) {
       attemptNumber = attemptNumber + 1;
       console.log("after attempt data");
       const body = {
