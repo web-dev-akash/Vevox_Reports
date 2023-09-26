@@ -12,6 +12,10 @@ require("dotenv").config();
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+const CLIENT_ID = process.env.CLIENT_ID;
+const CLIENT_SECRET = process.env.CLIENT_SECRET;
+const REFRESH_TOKEN = process.env.REFRESH_TOKEN;
 const PORT = process.env.PORT || 8080;
 
 const storage = multer.diskStorage({
@@ -27,6 +31,21 @@ app.use(express.static(path.join(__dirname, "template")));
 app.get("/", (req, res) => {
   res.sendFile(`index.html`);
 });
+
+const getZohoToken = async () => {
+  try {
+    const res = await axios.post(
+      `https://accounts.zoho.com/oauth/v2/token?client_id=${CLIENT_ID}&grant_type=refresh_token&client_secret=${CLIENT_SECRET}&refresh_token=${REFRESH_TOKEN}`
+    );
+    console.log(res.data);
+    const token = res.data.access_token;
+    return token;
+  } catch (error) {
+    res.send({
+      error,
+    });
+  }
+};
 
 const getVevoxSheetData = async () => {
   const spreadsheetId = process.env.SPREADSHEET_ID;
@@ -71,6 +90,129 @@ const addDataToSheet = async (users) => {
     },
   });
   return writeData.data;
+};
+
+const updateDataonZoho = async (users) => {
+  const token = await getZohoToken();
+  const config = {
+    headers: {
+      Authorization: `Zoho-oauthtoken ${token}`,
+      "Content-Type": "application/json",
+    },
+  };
+  const session = await axios.get(
+    `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[0].sessionId}))`,
+    config
+  );
+  const attemptsData = [];
+  for (let i = 0; i < users.length; i++) {
+    const contact = await axios.get(
+      `https://www.zohoapis.com/crm/v2/Contacts/search?email=${users[i].email}`,
+      config
+    );
+    if (!contact || !contact.data || !contact.data.data) {
+      continue;
+    }
+    console.log("Running----");
+    const contactId = contact.data.data[0].id;
+    if (!session || !session.data || !session.data.data) {
+      continue;
+    }
+    const totalSessions = session.data.data;
+    for (let j = 0; j < totalSessions.length; j++) {
+      const sessionId = totalSessions[j].id;
+      let sessionDate = new Date(
+        totalSessions[j].Session_Date_Time
+      ).toDateString();
+      let userAttemptDate = new Date(users[i].date).toDateString();
+      if (sessionDate === userAttemptDate) {
+        attemptsData.push({
+          contactId,
+          sessionId,
+          score: users[i].correct,
+        });
+      }
+    }
+    // const date = new Date();
+    // const year = date.getFullYear();
+    // const month = (date.getMonth() + 1).toString().padStart(2, "0");
+    // const day = date.getDate().toString().padStart(2, "0");
+    // const formattedDate = `${year}-${month}-${day}`;
+    // const body = {
+    //   data: [
+    //     {
+    //       id: contactId,
+    //       [key]: formattedDate,
+    //       $append_values: {
+    //         [key]: true,
+    //       },
+    //     },
+    //   ],
+    //   duplicate_check_fields: ["id"],
+    //   apply_feature_execution: [
+    //     {
+    //       name: "layout_rules",
+    //     },
+    //   ],
+    //   trigger: ["workflow"],
+    // };
+    // await axios.post(
+    //   `https://www.zohoapis.com/crm/v3/Contacts/upsert`,
+    //   body,
+    //   config
+    // );
+  }
+
+  ("https://www.zohoapis.com/crm/v2.1/Leads/actions/count");
+
+  const attemptsCount = await axios.get(
+    `https://www.zohoapis.com/crm/v2.1/Attempts/actions/count`,
+    config
+  );
+
+  let attemptNumber = attemptsCount.data.count;
+
+  for (let i = 0; i < attemptsData.length; i++) {
+    const attempts = await axios.get(
+      `https://www.zohoapis.com/crm/v2/Attempts/search?criteria=((Contact_Name:equals:${attemptsData[i].contactId})and(Session:equals:${attemptsData[i].sessionId}))`,
+      config
+    );
+    if (!attempts.data && !attempts.data.data) {
+      attemptNumber = attemptNumber + 1;
+      console.log("after attempt data");
+      const body = {
+        data: [
+          {
+            Name: `${attemptNumber}`,
+            Contact_Name: attemptsData[i].contactId,
+            Session: attemptsData[i].sessionId,
+            Quiz_Score: attemptsData[i].score,
+            $append_values: {
+              Name: true,
+              Contact_Name: true,
+              Session: true,
+              Quiz_Score: true,
+            },
+          },
+        ],
+        apply_feature_execution: [
+          {
+            name: "layout_rules",
+          },
+        ],
+        trigger: ["workflow"],
+      };
+      const attemptsres = await axios.post(
+        `https://www.zohoapis.com/crm/v3/Attempts/upsert`,
+        body,
+        config
+      );
+      console.log(attemptsres);
+    } else {
+      console.log("Attempt Already Exists");
+    }
+  }
+  return { message: "Success" };
 };
 
 const updateDataOnVevoxSheet = async (users) => {
@@ -164,39 +306,9 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
     for (const file of files) {
       await unlinkAsync(file.path);
     }
-    const data = await updateDataOnVevoxSheet(finalUsers);
-    let table = "";
-    data.map(
-      (user) =>
-        (table += `<tr>
-          <td style="border:1px solid; padding:10px 20px;">${user[0]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[1]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[2]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[3]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[4]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[5]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[6]}</td>
-          <td style="border:1px solid; padding:10px 20px;">${user[7]}</td>
-        </tr>`)
-    );
-    return res.status(200).send(`
-    <div style="width : 80%; margin : 50px auto; text-align : center; display : grid; place-items:center;">
-      <h1>Excel file uploaded and processed successfully.</h1>
-      <Table style="text-align : center; font-size : 20px; margin-top : 20px; border-collapse: collapse; ">
-        <Thead>
-          <th style="border:1px solid; padding:10px 20px;">First Name</th>
-          <th style="border:1px solid; padding:10px 20px;">Last Name</th>
-          <th style="border:1px solid; padding:10px 20px;">Correct Answer</th>
-          <th style="border:1px solid; padding:10px 20px;">Email</th>
-          <th style="border:1px solid; padding:10px 20px;">Date</th>
-          <th style="border:1px solid; padding:10px 20px;">Session ID</th>
-          <th style="border:1px solid; padding:10px 20px;">Attempted</th>
-          <th style="border:1px solid; padding:10px 20px;">Polled</th>
-        </Thead>
-        ${table}
-      </Table>
-    </div>
-    `);
+    const data1 = await updateDataOnVevoxSheet(finalUsers);
+    await updateDataonZoho(finalUsers);
+    return res.status(200).send({ data1 });
   } catch (error) {
     console.error("Error reading Excel file:", error);
     for (const file of files) {
