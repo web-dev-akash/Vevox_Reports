@@ -100,10 +100,6 @@ const updateDataonZoho = async (users) => {
       "Content-Type": "application/json",
     },
   };
-  const session = await axios.get(
-    `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[0].sessionId}))`,
-    config
-  );
   const attemptsData = [];
   for (let i = 0; i < users.length; i++) {
     const contact = await axios.get(
@@ -115,6 +111,10 @@ const updateDataonZoho = async (users) => {
     }
     console.log("Running----");
     const contactId = contact.data.data[0].id;
+    const session = await axios.get(
+      `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[i].sessionId}))`,
+      config
+    );
     if (!session || !session.data || !session.data.data) {
       continue;
     }
@@ -177,7 +177,7 @@ const updateDataonZoho = async (users) => {
         body,
         config
       );
-      console.log(attemptsres);
+      // console.log(attemptsres);
     } else {
       console.log("Attempt Already Exists");
     }
@@ -252,7 +252,7 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
         const totalNotEmpty = Object.values(data2[i]).filter(
           (val) => val === ""
         ).length;
-        console.log(totalNotEmpty);
+        // console.log(totalNotEmpty);
         const totalAttempted =
           totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
         const userFound = currentUsers.find(
