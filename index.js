@@ -130,6 +130,7 @@ const updateDataonZoho = async (users) => {
           contactId,
           sessionId,
           score: users[i].correct,
+          sessionDate,
         });
       }
     }
@@ -157,11 +158,13 @@ const updateDataonZoho = async (users) => {
             Contact_Name: attemptsData[i].contactId,
             Session: attemptsData[i].sessionId,
             Quiz_Score: attemptsData[i].score,
+            Session_Date_Time: attemptsData[i].sessionDate,
             $append_values: {
               Name: true,
               Contact_Name: true,
               Session: true,
               Quiz_Score: true,
+              Session_Date_Time: true,
             },
           },
         ],
