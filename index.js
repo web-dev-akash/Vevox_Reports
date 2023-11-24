@@ -130,7 +130,7 @@ const updateDataonZoho = async (users) => {
           contactId,
           sessionId,
           score: users[i].correct,
-          sessionDate,
+          sessionDate: totalSessions[j].Session_Date_Time,
         });
       }
     }
@@ -180,7 +180,7 @@ const updateDataonZoho = async (users) => {
         body,
         config
       );
-      // console.log(attemptsres);
+      console.log(attemptsres.data.data);
     } else {
       console.log("Attempt Already Exists");
     }
