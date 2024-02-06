@@ -100,17 +100,35 @@ const updateDataonZoho = async (users) => {
       "Content-Type": "application/json",
     },
   };
+
   const attemptsData = [];
+  const playersData = [];
   for (let i = 0; i < users.length; i++) {
     const contact = await axios.get(
       `https://www.zohoapis.com/crm/v2/Contacts/search?email=${users[i].email}`,
       config
     );
-    if (!contact || !contact.data || !contact.data.data) {
+    if (contact.status >= 400) {
       continue;
     }
-    console.log("Running----");
+
+    if (contact.status === 204) {
+      continue;
+    }
+
     const contactId = contact.data.data[0].id;
+    const name = contact.data.data[0].Student_Name;
+    const email = users[i].email;
+    const points = users[i].correct;
+
+    playersData.push({
+      player_name: name,
+      player_email: email,
+      player_external_id: contactId,
+      offline: "1",
+      points: points,
+    });
+
     const session = await axios.get(
       `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[i].sessionId}))`,
       config
@@ -185,6 +203,33 @@ const updateDataonZoho = async (users) => {
       console.log("Attempt Already Exists");
     }
   }
+
+  const api_key = process.env.POINTAGRAM_API_KEY;
+  const api_user = process.env.POINTAGRAM_API_USER;
+  const pointagramConfig = {
+    headers: {
+      api_key: api_key,
+      "Content-Type": "application/json",
+      api_user: api_user,
+    },
+  };
+  for (let i = 0; i < playersData.length; i++) {
+    const player = await axios.post(
+      `https://app.pointagram.com/server/externalapi.php/create_player`,
+      playersData[i],
+      pointagramConfig
+    );
+    const addPoints = await axios.post(
+      "https://app.pointagram.com/server/externalapi.php/add_score",
+      {
+        player_external_id: playersData[i].player_external_id,
+        points: playersData[i].points,
+        scoreseries_name: "Wise Coins",
+      },
+      pointagramConfig
+    );
+    console.log(player.data, addPoints.data);
+  }
   return { message: "Success" };
 };
 
@@ -255,7 +300,7 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
         const totalNotEmpty = Object.values(data2[i]).filter(
           (val) => val === ""
         ).length;
-        // console.log(totalNotEmpty);
+
         const totalAttempted =
           totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
         const userFound = currentUsers.find(
@@ -281,7 +326,7 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
     }
     const data1 = await updateDataOnVevoxSheet(finalUsers);
     await updateDataonZoho(finalUsers);
-    return res.status(200).send({ data1 });
+    return res.status(200).send({ data: data1 });
   } catch (error) {
     console.error("Error reading Excel file:", error);
     for (const file of files) {
