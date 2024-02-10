@@ -204,32 +204,32 @@ const updateDataonZoho = async (users) => {
     }
   }
 
-  const api_key = process.env.POINTAGRAM_API_KEY;
-  const api_user = process.env.POINTAGRAM_API_USER;
-  const pointagramConfig = {
-    headers: {
-      api_key: api_key,
-      "Content-Type": "application/json",
-      api_user: api_user,
-    },
-  };
-  for (let i = 0; i < playersData.length; i++) {
-    const player = await axios.post(
-      `https://app.pointagram.com/server/externalapi.php/create_player`,
-      playersData[i],
-      pointagramConfig
-    );
-    const addPoints = await axios.post(
-      "https://app.pointagram.com/server/externalapi.php/add_score",
-      {
-        player_external_id: playersData[i].player_external_id,
-        points: playersData[i].points,
-        scoreseries_name: "Wise Coins",
-      },
-      pointagramConfig
-    );
-    console.log(player.data, addPoints.data);
-  }
+  // const api_key = process.env.POINTAGRAM_API_KEY;
+  // const api_user = process.env.POINTAGRAM_API_USER;
+  // const pointagramConfig = {
+  //   headers: {
+  //     api_key: api_key,
+  //     "Content-Type": "application/json",
+  //     api_user: api_user,
+  //   },
+  // };
+  // for (let i = 0; i < playersData.length; i++) {
+  //   const player = await axios.post(
+  //     `https://app.pointagram.com/server/externalapi.php/create_player`,
+  //     playersData[i],
+  //     pointagramConfig
+  //   );
+  //   const addPoints = await axios.post(
+  //     "https://app.pointagram.com/server/externalapi.php/add_score",
+  //     {
+  //       player_external_id: playersData[i].player_external_id,
+  //       points: playersData[i].points,
+  //       scoreseries_name: "Wise Coins",
+  //     },
+  //     pointagramConfig
+  //   );
+  //   console.log(player.data, addPoints.data);
+  // }
   return { message: "Success" };
 };
 
