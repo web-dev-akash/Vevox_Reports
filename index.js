@@ -108,50 +108,38 @@ const updateDataonZoho = async (users) => {
       `https://www.zohoapis.com/crm/v2/Contacts/search?email=${users[i].email}`,
       config
     );
-    if (contact.status >= 400) {
-      continue;
-    }
-
-    if (contact.status === 204) {
+    if (contact.status >= 400 || contact.status === 204) {
       continue;
     }
 
     const contactId = contact.data.data[0].id;
     const name = contact.data.data[0].Student_Name;
     const email = users[i].email;
-    const points = users[i].correct;
+    const score = users[i].correct;
 
     playersData.push({
       player_name: name,
       player_email: email,
       player_external_id: contactId,
       offline: "1",
-      points: points,
+      points: score,
     });
 
     const session = await axios.get(
       `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[i].sessionId}))`,
       config
     );
-    if (!session || !session.data || !session.data.data) {
+    if (session.status >= 400 || session.status === 204) {
       continue;
     }
-    const totalSessions = session.data.data;
-    for (let j = 0; j < totalSessions.length; j++) {
-      const sessionId = totalSessions[j].id;
-      let sessionDate = new Date(
-        totalSessions[j].Session_Date_Time
-      ).toDateString();
-      let userAttemptDate = new Date(users[i].date).toDateString();
-      if (sessionDate === userAttemptDate) {
-        attemptsData.push({
-          contactId,
-          sessionId,
-          score: users[i].correct,
-          sessionDate: totalSessions[j].Session_Date_Time,
-        });
-      }
-    }
+    const totalSessions = session.data.data[0];
+    const sessionId = totalSessions.id;
+    attemptsData.push({
+      contactId,
+      sessionId,
+      score: score,
+      sessionDate: totalSessions.Session_Date_Time,
+    });
   }
 
   const attemptsCount = await axios.get(
@@ -160,48 +148,48 @@ const updateDataonZoho = async (users) => {
   );
 
   let attemptNumber = attemptsCount.data.count;
-
+  const body = {
+    data: [],
+    apply_feature_execution: [
+      {
+        name: "layout_rules",
+      },
+    ],
+    trigger: ["workflow"],
+  };
   for (let i = 0; i < attemptsData.length; i++) {
     const attempts = await axios.get(
       `https://www.zohoapis.com/crm/v2/Attempts/search?criteria=((Contact_Name:equals:${attemptsData[i].contactId})and(Session:equals:${attemptsData[i].sessionId}))`,
       config
     );
-    if (!attempts || !attempts.data || !attempts.data.data) {
-      attemptNumber = attemptNumber + 1;
-      console.log("after attempt data");
-      const body = {
-        data: [
-          {
-            Name: `${attemptNumber}`,
-            Contact_Name: attemptsData[i].contactId,
-            Session: attemptsData[i].sessionId,
-            Quiz_Score: attemptsData[i].score,
-            Session_Date_Time: attemptsData[i].sessionDate,
-            $append_values: {
-              Name: true,
-              Contact_Name: true,
-              Session: true,
-              Quiz_Score: true,
-              Session_Date_Time: true,
-            },
-          },
-        ],
-        apply_feature_execution: [
-          {
-            name: "layout_rules",
-          },
-        ],
-        trigger: ["workflow"],
-      };
-      const attemptsres = await axios.post(
-        `https://www.zohoapis.com/crm/v3/Attempts/upsert`,
-        body,
-        config
-      );
-      console.log(attemptsres.data.data);
-    } else {
-      console.log("Attempt Already Exists");
+    if (attempts.status === 200) {
+      console.log("Attempts Already Exists");
+      continue;
     }
+    attemptNumber = attemptNumber + 1;
+    body.data.push({
+      Name: `${attemptNumber}`,
+      Contact_Name: attemptsData[i].contactId,
+      Session: attemptsData[i].sessionId,
+      Quiz_Score: attemptsData[i].score,
+      Session_Date_Time: attemptsData[i].sessionDate,
+      $append_values: {
+        Name: true,
+        Contact_Name: true,
+        Session: true,
+        Quiz_Score: true,
+        Session_Date_Time: true,
+      },
+    });
+  }
+  console.log(body);
+  if (body.data.length > 0) {
+    const attemptsres = await axios.post(
+      `https://www.zohoapis.com/crm/v3/Attempts/upsert`,
+      body,
+      config
+    );
+    return { message: "SUCCESS", newAttempt: attemptsres?.data?.data };
   }
 
   // const api_key = process.env.POINTAGRAM_API_KEY;
@@ -230,7 +218,7 @@ const updateDataonZoho = async (users) => {
   //   );
   //   console.log(player.data, addPoints.data);
   // }
-  return { message: "Success" };
+  return { message: "Attempts Already Exists", newAttempt: [] };
 };
 
 const updateDataOnVevoxSheet = async (users) => {
@@ -324,9 +312,9 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
     for (const file of files) {
       await unlinkAsync(file.path);
     }
-    const data1 = await updateDataOnVevoxSheet(finalUsers);
-    await updateDataonZoho(finalUsers);
-    return res.status(200).send({ data: data1 });
+    await updateDataOnVevoxSheet(finalUsers);
+    const data = await updateDataonZoho(finalUsers);
+    return res.status(200).send({ data: data });
   } catch (error) {
     console.error("Error reading Excel file:", error);
     for (const file of files) {
