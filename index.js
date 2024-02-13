@@ -182,43 +182,53 @@ const updateDataonZoho = async (users) => {
       },
     });
   }
-  console.log(body);
+
   if (body.data.length > 0) {
     const attemptsres = await axios.post(
       `https://www.zohoapis.com/crm/v3/Attempts/upsert`,
       body,
       config
     );
-    return { message: "SUCCESS", newAttempt: attemptsres?.data?.data };
+    console.log("Zoho Attempts Updated");
   }
 
-  // const api_key = process.env.POINTAGRAM_API_KEY;
-  // const api_user = process.env.POINTAGRAM_API_USER;
-  // const pointagramConfig = {
-  //   headers: {
-  //     api_key: api_key,
-  //     "Content-Type": "application/json",
-  //     api_user: api_user,
-  //   },
-  // };
-  // for (let i = 0; i < playersData.length; i++) {
-  //   const player = await axios.post(
-  //     `https://app.pointagram.com/server/externalapi.php/create_player`,
-  //     playersData[i],
-  //     pointagramConfig
-  //   );
-  //   const addPoints = await axios.post(
-  //     "https://app.pointagram.com/server/externalapi.php/add_score",
-  //     {
-  //       player_external_id: playersData[i].player_external_id,
-  //       points: playersData[i].points,
-  //       scoreseries_name: "Wise Coins",
-  //     },
-  //     pointagramConfig
-  //   );
-  //   console.log(player.data, addPoints.data);
-  // }
-  return { message: "Attempts Already Exists", newAttempt: [] };
+  const api_key = process.env.POINTAGRAM_API_KEY;
+  const api_user = process.env.POINTAGRAM_API_USER;
+  const pointagramConfig = {
+    headers: {
+      api_key: api_key,
+      "Content-Type": "application/json",
+      api_user: api_user,
+    },
+  };
+  const requests = playersData.map(async (player) => {
+    const email = player.player_email;
+    const listPlayers = await axios.get(
+      `https://app.pointagram.com/server/externalapi.php/list_players?search_by=Email&filter=${email}`,
+      pointagramConfig
+    );
+
+    if (listPlayers.data?.length === 0) {
+      console.log("Creating a new player:", email);
+      await axios.post(
+        `https://app.pointagram.com/server/externalapi.php/create_player`,
+        player,
+        pointagramConfig
+      );
+    }
+
+    await axios.post(
+      "https://app.pointagram.com/server/externalapi.php/add_score",
+      {
+        player_external_id: player.player_external_id,
+        points: player.points,
+        scoreseries_name: "Wise Coins",
+      },
+      pointagramConfig
+    );
+  });
+  await Promise.all(requests);
+  return { message: "SUCCESS" };
 };
 
 const updateDataOnVevoxSheet = async (users) => {
