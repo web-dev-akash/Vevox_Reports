@@ -122,7 +122,6 @@ const updateDataonZoho = async (users) => {
       player_email: email,
       player_external_id: contactId,
       offline: "1",
-      points: score,
     });
 
     const session = await axios.get(
@@ -216,16 +215,6 @@ const updateDataonZoho = async (users) => {
         pointagramConfig
       );
     }
-
-    // await axios.post(
-    //   "https://app.pointagram.com/server/externalapi.php/add_score",
-    //   {
-    //     player_external_id: player.player_external_id,
-    //     points: player.points,
-    //     scoreseries_name: "Wise Coins",
-    //   },
-    //   pointagramConfig
-    // );
   });
   await Promise.all(requests);
   return { message: "SUCCESS" };
