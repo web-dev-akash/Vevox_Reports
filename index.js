@@ -200,23 +200,22 @@ const updateDataonZoho = async (users) => {
       api_user: api_user,
     },
   };
-  const requests = playersData.map(async (player) => {
-    const email = player.player_email;
-    const listPlayers = await axios.get(
-      `https://app.pointagram.com/server/externalapi.php/list_players?search_by=Email&filter=${email}`,
-      pointagramConfig
-    );
-
-    if (listPlayers.data?.length === 0) {
-      console.log("Creating a new player:", email);
-      await axios.post(
-        `https://app.pointagram.com/server/externalapi.php/create_player`,
-        player,
-        pointagramConfig
-      );
-    }
-  });
-  await Promise.all(requests);
+  // const requests = playersData.map(async (player) => {
+  //   const email = player.player_email;
+  //   const listPlayers = await axios.get(
+  //     `https://app.pointagram.com/server/externalapi.php/list_players?search_by=Email&filter=${email}`,
+  //     pointagramConfig
+  //   );
+  //   if (listPlayers.data?.length === 0) {
+  //     console.log("Creating a new player:", email);
+  //     await axios.post(
+  //       `https://app.pointagram.com/server/externalapi.php/create_player`,
+  //       player,
+  //       pointagramConfig
+  //     );
+  //   }
+  // });
+  // await Promise.all(requests);
   return { message: "SUCCESS" };
 };
 
