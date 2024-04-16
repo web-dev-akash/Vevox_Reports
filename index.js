@@ -8,10 +8,15 @@ const multer = require("multer");
 const fs = require("fs");
 const { promisify } = require("util");
 const unlinkAsync = promisify(fs.unlink);
+const { pLimit } = require("plimit-lit");
+const moment = require("moment");
 require("dotenv").config();
+
 const app = express();
 app.use(express.urlencoded({ extended: true }));
 app.use(cors());
+
+const limit = pLimit(20);
 
 const CLIENT_ID = process.env.CLIENT_ID;
 const CLIENT_SECRET = process.env.CLIENT_SECRET;
@@ -92,6 +97,72 @@ const addDataToSheet = async (users) => {
   return writeData.data;
 };
 
+const findUserWithEmail = async (email, config) => {
+  try {
+    const contact = await axios.get(
+      `https://www.zohoapis.com/crm/v2/Contacts/search?email=${email}`,
+      config
+    );
+
+    if (contact.status >= 400 || contact.status === 204) {
+      return {
+        status: contact.status,
+      };
+    }
+
+    return {
+      status: 200,
+      id: contact.data.data[0].id,
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      message: error.message,
+      email: email,
+    };
+  }
+};
+
+const getAnalysisData = async (query, zohoConfig) => {
+  try {
+    const response = await axios.post(
+      `https://www.zohoapis.com/crm/v3/coql`,
+      { select_query: query },
+      zohoConfig
+    );
+    if (response.status >= 400 || response.status === 204) {
+      return {
+        status: response.status,
+      };
+    }
+    return {
+      status: response.status,
+      id: response.data.data[0].id,
+      sessionDate: response.data.data[0].Session_Date_Time,
+    };
+  } catch (error) {
+    throw error;
+  }
+};
+
+const addAttemptToZoho = async (body, config) => {
+  try {
+    const attemptsres = await axios.post(
+      `https://www.zohoapis.com/crm/v3/Attempts`,
+      body,
+      config
+    );
+    return {
+      status: attemptsres.status,
+    };
+  } catch (error) {
+    return {
+      status: 500,
+      message: error.message,
+    };
+  }
+};
+
 const updateDataonZoho = async (users) => {
   const token = await getZohoToken();
   const config = {
@@ -101,45 +172,26 @@ const updateDataonZoho = async (users) => {
     },
   };
 
-  const attemptsData = [];
-  const playersData = [];
-  for (let i = 0; i < users.length; i++) {
-    const contact = await axios.get(
-      `https://www.zohoapis.com/crm/v2/Contacts/search?email=${users[i].email}`,
-      config
-    );
-    if (contact.status >= 400 || contact.status === 204) {
-      continue;
-    }
+  const attemptsData = await Promise.all(
+    users.map(async (user) => {
+      const sessionQuery = `select id, Session_Date_Time from Sessions where Vevox_Session_ID = '${user.sessionId}'`;
+      const [contact, session] = await Promise.all([
+        limit(() => findUserWithEmail(user.email, config)),
+        limit(() => getAnalysisData(sessionQuery, config)),
+      ]);
+      if (contact.status === 200 && session.status === 200) {
+        return {
+          contactId: contact.id,
+          sessionId: session.id,
+          score: user.correct,
+          sessionDate: session.sessionDate,
+        };
+      }
+      return;
+    })
+  );
 
-    const contactId = contact.data.data[0].id;
-    const name = contact.data.data[0].Student_Name;
-    const email = users[i].email;
-    const score = users[i].correct;
-
-    playersData.push({
-      player_name: name,
-      player_email: email,
-      player_external_id: contactId,
-      offline: "1",
-    });
-
-    const session = await axios.get(
-      `https://www.zohoapis.com/crm/v2/Sessions/search?criteria=((Vevox_Session_ID:equals:${users[i].sessionId}))`,
-      config
-    );
-    if (session.status >= 400 || session.status === 204) {
-      continue;
-    }
-    const totalSessions = session.data.data[0];
-    const sessionId = totalSessions.id;
-    attemptsData.push({
-      contactId,
-      sessionId,
-      score: score,
-      sessionDate: totalSessions.Session_Date_Time,
-    });
-  }
+  console.log("Attempts", attemptsData);
 
   const attemptsCount = await axios.get(
     `https://www.zohoapis.com/crm/v2.1/Attempts/actions/count`,
@@ -156,68 +208,37 @@ const updateDataonZoho = async (users) => {
     ],
     trigger: ["workflow"],
   };
-  for (let i = 0; i < attemptsData.length; i++) {
-    const attempts = await axios.get(
-      `https://www.zohoapis.com/crm/v2/Attempts/search?criteria=((Contact_Name:equals:${attemptsData[i].contactId})and(Session:equals:${attemptsData[i].sessionId}))`,
-      config
-    );
-    if (attempts.status === 200) {
-      console.log("Attempts Already Exists");
-      continue;
-    }
-    attemptNumber = attemptNumber + 1;
-    body.data.push({
-      Name: `${attemptNumber}`,
-      Contact_Name: attemptsData[i].contactId,
-      Session: attemptsData[i].sessionId,
-      Quiz_Score: attemptsData[i].score,
-      Session_Date_Time: attemptsData[i].sessionDate,
-      $append_values: {
-        Name: true,
-        Contact_Name: true,
-        Session: true,
-        Quiz_Score: true,
-        Session_Date_Time: true,
-      },
-    });
-  }
 
-  if (body.data.length > 0) {
-    const attemptsres = await axios.post(
-      `https://www.zohoapis.com/crm/v3/Attempts/upsert`,
-      body,
-      config
-    );
-    console.log("Zoho Attempts Updated");
-  }
-
-  const api_key = process.env.POINTAGRAM_API_KEY;
-  const api_user = process.env.POINTAGRAM_API_USER;
-  const pointagramConfig = {
-    headers: {
-      api_key: api_key,
-      "Content-Type": "application/json",
-      api_user: api_user,
-    },
+  const sendData = async () => {
+    const addAttempts = await addAttemptToZoho(body, config);
+    console.log("Add Attempts", addAttempts);
+    body.data = [];
+    console.log("Body after 100 attempts :", body);
   };
-  const requests = playersData.map(async (player) => {
-    const email = player.player_email;
-    const listPlayers = await axios.get(
-      `https://app.pointagram.com/server/externalapi.php/list_players?search_by=Email&filter=${email}`,
-      pointagramConfig
-    );
 
-    if (listPlayers.data?.length === 0) {
-      console.log("Creating a new player:", email);
-      await axios.post(
-        `https://app.pointagram.com/server/externalapi.php/create_player`,
-        player,
-        pointagramConfig
-      );
+  for (const attempt of attemptsData) {
+    const attemptsQuery = `select Contact_Name.id as contactId from Attempts where Contact_Name = '${attempt.contactId}' and Session = '${attempt.sessionId}'`;
+    const [attempts] = await Promise.all([
+      limit(() => getAnalysisData(attemptsQuery, config)),
+    ]);
+    if (attempts.status !== 200) {
+      attemptNumber += 1;
+      body.data.push({
+        Name: `${attemptNumber}`,
+        Contact_Name: attempt.contactId,
+        Session: attempt.sessionId,
+        Quiz_Score: attempt.score,
+        Session_Date_Time: attempt.sessionDate,
+      });
+      if (body.data.length === 100) {
+        await sendData();
+      }
     }
-  });
-  await Promise.all(requests);
-  return { message: "SUCCESS" };
+  }
+  if (body.data.length > 0) {
+    await sendData();
+  }
+  return { result: "Success" };
 };
 
 const updateDataOnVevoxSheet = async (users) => {
@@ -313,7 +334,7 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
     }
     await updateDataOnVevoxSheet(finalUsers);
     const data = await updateDataonZoho(finalUsers);
-    return res.status(200).send({ data: data });
+    return res.status(200).send(data);
   } catch (error) {
     console.error("Error reading Excel file:", error);
     for (const file of files) {

@@ -18,6 +18,7 @@
     "googleapis": "^126.0.0",
     "multer": "^1.4.5-lts.1",
     "path": "^0.12.7",
+    "plimit-lit": "^2.1.0",
     "read-excel-file": "^5.6.1",
     "xlsx": "^0.18.5"
   }
