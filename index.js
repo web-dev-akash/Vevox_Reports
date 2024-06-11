@@ -190,8 +190,6 @@ const updateDataonZoho = async (users) => {
     })
   );
 
-  console.log("Attempts", attemptsData);
-
   const attemptsCount = await axios.get(
     `https://www.zohoapis.com/crm/v2.1/Attempts/actions/count`,
     config
@@ -210,9 +208,7 @@ const updateDataonZoho = async (users) => {
 
   const sendData = async () => {
     const addAttempts = await addAttemptToZoho(body, config);
-    console.log("Add Attempts", addAttempts);
     body.data = [];
-    console.log("Body after 100 attempts :", body);
   };
 
   for (const attempt of attemptsData) {
@@ -264,6 +260,20 @@ const updateDataOnVevoxSheet = async (users) => {
   return addVevoxData;
 };
 
+function getLastPollNumber(data) {
+  const keys = Object.keys(data);
+  const emptyKeys = keys.filter((key) => key.startsWith("__EMPTY_"));
+  const lastKey = emptyKeys
+    .sort((a, b) => {
+      const numA = parseInt(a.split("_")[1]);
+      const numB = parseInt(b.split("_")[1]);
+      return numA - numB;
+    })
+    .pop();
+
+  return data[lastKey];
+}
+
 app.post("/view", upload.array("file", 50), async (req, res) => {
   const files = req.files;
   if (files.length === 0) {
@@ -286,7 +296,7 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
       for (let i = 8; i < data1.length; i++) {
         const firstname = data1[i][""];
         const lastname = data1[i]["__EMPTY"];
-        const email = data1[i]["__EMPTY_1"];
+        const email = data1[i]["__EMPTY_1"].trim();
         const attemptDate = new Date(
           data1[i]["__EMPTY_2"].substring(0, 11)
         ).toDateString();
@@ -299,26 +309,30 @@ app.post("/view", upload.array("file", 50), async (req, res) => {
       const sheetName2 = workbook.SheetNames[2];
       const sheet2 = workbook.Sheets[sheetName2];
       const data2 = xlsx.utils.sheet_to_json(sheet2);
-      const totalPolled = Object.values(data2[2]).length - 3;
-      for (let i = 7; i < data2.length - 2; i++) {
+      const totalPolled = getLastPollNumber(data2[0]);
+      for (let i = 7; i < data2.length; i++) {
         const firstname = data2[i]["Polling Results"];
         const lastname = data2[i]["__EMPTY"];
-        const correct = data2[i]["__EMPTY_1"] ? data2[i]["__EMPTY_1"] : 0;
+        const email = data2[i]["__EMPTY_1"].trim();
+        if (!firstname && !email) {
+          continue;
+        }
+        const correct = data2[i]["__EMPTY_2"] ? data2[i]["__EMPTY_2"] : 0;
         const totalNotEmpty = Object.values(data2[i]).filter(
-          (val) => val === ""
+          (val) => val !== ""
         ).length;
 
         const totalAttempted =
-          totalNotEmpty === 0 ? 0 : totalPolled - totalNotEmpty;
-        const userFound = currentUsers.find(
-          (user) => user.firstname === firstname && user.lastname === lastname
-        );
+          totalPolled - (Object.keys(data2[i]).length - totalNotEmpty);
+
+        const userFound = currentUsers.find((user) => user.email === email);
+
         if (userFound) {
           const obj = {
             firstname,
             lastname,
             correct,
-            email: userFound.email,
+            email: email,
             date: userFound.attemptDate,
             polled: totalPolled,
             attempted: totalAttempted,
