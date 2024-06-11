@@ -178,6 +178,7 @@ const updateDataonZoho = async (users) => {
         limit(() => findUserWithEmail(user.email, config)),
         limit(() => getAnalysisData(sessionQuery, config)),
       ]);
+
       if (contact.status === 200 && session.status === 200) {
         return {
           contactId: contact.id,
@@ -186,7 +187,6 @@ const updateDataonZoho = async (users) => {
           sessionDate: session.sessionDate,
         };
       }
-      return;
     })
   );
 
@@ -212,6 +212,9 @@ const updateDataonZoho = async (users) => {
   };
 
   for (const attempt of attemptsData) {
+    if (!attempt) {
+      continue;
+    }
     const attemptsQuery = `select Contact_Name.id as contactId from Attempts where Contact_Name = '${attempt.contactId}' and Session = '${attempt.sessionId}'`;
     const [attempts] = await Promise.all([
       limit(() => getAnalysisData(attemptsQuery, config)),
